@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blow Out the Candles 🎂🔥</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body { text-align: center; font-family: Arial, sans-serif; background-color: #fbeee0; }
+        canvas { background-color: white; border-radius: 10px; margin-top: 20px; }
+        h1 { color: #d35400; }
+        button { padding: 10px 20px; font-size: 18px; background: #27ae60; color: white; border: none; cursor: pointer; }
+        button:hover { background: #2ecc71; }
+    </style>
+</head>
+<body>
+    <h1>Blow Out the Candles 🎂</h1>
+    <p>Blow into your mic to put out the candles!</p>
+    <canvas id="cakeCanvas" width="500" height="400"></canvas>
+    <br>
+    <button onclick="startListening()">Start Mic</button>
+
+    <script>
+  const canvas = document.getElementById("cakeCanvas");
+const ctx = canvas.getContext("2d");
+
+let candles = [
+    { x: 160, y: 190, isBlown: false, flicker: 0 },
+    { x: 240, y: 190, isBlown: false, flicker: 0 },
+    { x: 320, y: 190, isBlown: false, flicker: 0 }
+];
+
+let allBlownOut = false;
+
+function drawCake() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw cake
+    ctx.fillStyle = "#d35400";
+    ctx.fillRect(100, 250, 300, 100);
+    ctx.fillStyle = "#e67e22";
+    ctx.fillRect(100, 240, 300, 20);
+
+    // Draw candles
+    candles.forEach(candle => {
+        ctx.fillStyle = "brown";
+        ctx.fillRect(candle.x, candle.y, 10, 50);
+
+        // If not blown out, add flickering effect
+        if (!candle.isBlown) {
+            let flameY = candle.y - (10 + Math.random() * 5);  // Make flame flicker
+            drawFlame(candle.x + 5, flameY);
+        }
+    });
+
+    if (allBlownOut) {
+        ctx.fillStyle = "red";
+        ctx.font = "30px Arial";
+        ctx.fillText("🎉 Happy Birthday! 🎉", 120, 180);
+    }
+}
+
+function drawFlame(x, y, flicker = true) {
+    ctx.beginPath();
+    
+    // Flicker effect (random movement)
+    let offsetX = flicker ? (Math.random() * 4 - 2) : 0; 
+    let offsetY = flicker ? (Math.random() * 4 - 2) : 0; 
+
+    // Outer Flame (Orange)
+    ctx.fillStyle = "orange";
+    ctx.moveTo(x + offsetX, y + offsetY);
+    ctx.bezierCurveTo(x - 8, y - 15, x - 5, y - 40, x, y - 50);
+    ctx.bezierCurveTo(x + 5, y - 40, x + 8, y - 15, x, y);
+    ctx.fill();
+
+    // Inner Flame (Yellow)
+    ctx.beginPath();
+    ctx.fillStyle = "yellow";
+    ctx.moveTo(x + offsetX, y + offsetY - 5);
+    ctx.bezierCurveTo(x - 4, y - 10, x - 3, y - 30, x, y - 40);
+    ctx.bezierCurveTo(x + 3, y - 30, x + 4, y - 10, x, y - 5);
+    ctx.fill();
+}
+
+
+
+
+drawCake();  // Initial draw
+
+const socket = io.connect("http://127.0.0.1:5000");
+
+// WebSocket listener for blowing out candles
+socket.on("blow_out_candles", () => {
+    candles.forEach(candle => candle.isBlown = true);
+    allBlownOut = candles.every(candle => candle.isBlown);
+    drawCake();  // Update canvas
+});
+
+function startListening() {
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const analyser = audioContext.createAnalyser();
+        const microphone = audioContext.createMediaStreamSource(stream);
+        microphone.connect(analyser);
+        analyser.fftSize = 256;
+
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+
+        function detectBlow() {
+            analyser.getByteFrequencyData(dataArray);
+            let volume = dataArray.reduce((a, b) => a + b, 0) / bufferLength;
+
+            console.log("Volume:", volume);  // Debugging
+
+            if (volume > 20) {
+                socket.emit("audio_data", Array.from(dataArray));
+            }
+
+            drawCake();  // Keep updating flame flickering effect
+            requestAnimationFrame(detectBlow);
+        }
+
+        detectBlow();  // Start detecting
+    }).catch(error => console.error("Mic Access Denied!", error));
+}
+
+    </script>
+</body>
+</html>
