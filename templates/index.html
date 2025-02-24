@@ -88,7 +88,7 @@ function drawFlame(x, y, flicker = true) {
 
 drawCake();  // Initial draw
 
-const socket = io.connect("http://127.0.0.1:5000");
+const socket = io.connect(window.location.origin);  // Automatically uses Railway's domain
 
 // WebSocket listener for blowing out candles
 socket.on("blow_out_candles", () => {
